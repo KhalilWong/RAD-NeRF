@@ -9,75 +9,12 @@ from .asr import ASR
 
 import cv2
 
-class OrbitCamera:
-    def __init__(self, W, H, r=2, fovy=60):
-        self.W = W
-        self.H = H
-        self.radius = r # camera distance from center
-        self.fovy = fovy # in degree
-        self.center = np.array([0, 0, 0], dtype=np.float32) # look at this point
-        self.rot = R.from_matrix([[0, -1, 0], [0, 0, -1], [1, 0, 0]]) # init camera matrix: [[1, 0, 0], [0, -1, 0], [0, 0, 1]] (to suit ngp convention)
-        self.up = np.array([1, 0, 0], dtype=np.float32) # need to be normalized!
-
-    # pose
-    @property
-    def pose(self):
-        # first move camera to radius
-        res = np.eye(4, dtype=np.float32)
-        res[2, 3] -= self.radius
-        # rotate
-        rot = np.eye(4, dtype=np.float32)
-        rot[:3, :3] = self.rot.as_matrix()
-        res = rot @ res
-        # translate
-        res[:3, 3] -= self.center
-        return res
-
-    def update_pose(self, pose):
-        # pose: [4, 4] numpy array
-        # assert self.center is 0
-        self.radius = np.linalg.norm(pose[:3, 3])
-        T = np.eye(4)
-        T[2, 3] = -self.radius
-        rot = pose @ np.linalg.inv(T)
-        self.rot = R.from_matrix(rot[:3, :3])
-
-    def update_intrinsics(self, intrinsics):
-        fl_x, fl_y, cx, cy = intrinsics
-        self.W = int(cx * 2)
-        self.H = int(cy * 2)
-        self.fovy = np.rad2deg(2 * np.arctan2(self.H, 2 * fl_y))
-    
-    # intrinsics
-    @property
-    def intrinsics(self):
-        focal = self.H / (2 * np.tan(np.deg2rad(self.fovy) / 2))
-        return np.array([focal, focal, self.W // 2, self.H // 2])
-    
-    def orbit(self, dx, dy):
-        # rotate along camera up/side axis!
-        side = self.rot.as_matrix()[:3, 0] # why this is side --> ? # already normalized.
-        rotvec_x = self.up * np.radians(-0.01 * dx)
-        rotvec_y = side * np.radians(-0.01 * dy)
-        self.rot = R.from_rotvec(rotvec_x) * R.from_rotvec(rotvec_y) * self.rot
-
-    def scale(self, delta):
-        self.radius *= 1.1 ** (-delta)
-
-    def pan(self, dx, dy, dz=0):
-        # pan in camera coordinate system (careful on the sensitivity!)
-        self.center += 0.0001 * self.rot.as_matrix()[:3, :3] @ np.array([dx, dy, dz])
-
-
 class NeRFNoGUILive:
     def __init__(self, opt, trainer, data_loader, debug=True):
         self.opt = opt # shared with the trainer's opt to support in-place modification of rendering parameters.
         self.W = opt.W
         self.H = opt.H
-        self.cam = OrbitCamera(opt.W, opt.H, r=opt.radius, fovy=opt.fovy)
         self.debug = debug
-        self.training = False
-        self.step = 0 # training step 
 
         self.trainer = trainer
         self.data_loader = data_loader
@@ -85,11 +22,9 @@ class NeRFNoGUILive:
         # override with dataloader's intrinsics
         self.W = data_loader._data.W
         self.H = data_loader._data.H
-        self.cam.update_intrinsics(data_loader._data.intrinsics)
 
         # use dataloader's pose
         pose_init = data_loader._data.poses[0]
-        self.cam.update_pose(pose_init.detach().cpu().numpy())
 
         # use dataloader's bg
         bg_img = data_loader._data.bg_img #.view(1, -1, 3)
@@ -113,9 +48,7 @@ class NeRFNoGUILive:
         self.spp = 1 # sample per pixel
         self.mode = 'image' # choose from ['image', 'depth']
 
-        self.dynamic_resolution = False # assert False!
         self.downscale = 1
-        self.train_steps = 16
 
         self.ind_index = 0
         self.ind_num = trainer.model.individual_codes.shape[0]
@@ -159,28 +92,10 @@ class NeRFNoGUILive:
                     data['auds'] = self.asr.get_next_feat()
 
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
-
-                # sync local camera pose
-                self.cam.update_pose(data['poses_matrix'][0].detach().cpu().numpy())
             
-            else:
-                if self.audio_features is not None:
-                    auds = get_audio_features(self.audio_features, self.opt.att, self.audio_idx)
-                else:
-                    auds = None
-                outputs = self.trainer.test_gui(self.cam.pose, self.cam.intrinsics, self.W, self.H, auds, self.eye_area, self.ind_index, self.bg_color, self.spp, self.downscale)
-
             ender.record()
             torch.cuda.synchronize()
             t = starter.elapsed_time(ender)
-
-            # update dynamic resolution
-            if self.dynamic_resolution:
-                # max allowed infer time per-frame is 200 ms
-                full_t = t / (self.downscale ** 2)
-                downscale = min(1, max(1/4, math.sqrt(200 / full_t)))
-                if downscale > self.downscale * 1.2 or downscale < self.downscale * 0.8:
-                    self.downscale = downscale
 
             if self.need_update:
                 self.render_buffer = self.prepare_buffer(outputs)
@@ -196,7 +111,8 @@ class NeRFNoGUILive:
             return int(1000/t), cv2.cvtColor(self.render_buffer, cv2.COLOR_BGR2RGB)
 
     def render(self):
-
+        if self.opt.asr:
+            self.asr.warm_up()
         while True:
             # update every frame
             # audio stream thread...
@@ -205,6 +121,11 @@ class NeRFNoGUILive:
                 for _ in range(2):
                     self.asr.run_step()
             fps, image = self.test_step()
-            print(fps)
+            #print(fps)
+            cv2.putText(image, '%.2f' % fps, (5,50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
             cv2.imshow('MyLive', image)
-            cv2.waitKey(1)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        if self.opt.asr:
+            self.asr.stop()
+        cv2.destroyAllWindows()

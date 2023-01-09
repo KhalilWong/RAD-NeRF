@@ -194,6 +194,7 @@ if __name__ == '__main__':
         elif opt.asr_nogui:
             with NeRFNoGUILive(opt, trainer, test_loader) as gui:
                 gui.render()
+                print('Start Living')
         else:
             ### evaluate metrics (slow)
             if test_loader.has_gt:
