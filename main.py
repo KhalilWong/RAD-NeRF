@@ -3,6 +3,7 @@ import argparse
 
 from nerf.provider import NeRFDataset
 from nerf.gui import NeRFGUI
+from nerf.LiveWithoutGUI import NeRFNoGUILive
 from nerf.utils import *
 
 # torch.autograd.set_detect_anomaly(True)
@@ -92,6 +93,7 @@ if __name__ == '__main__':
 
     # asr
     parser.add_argument('--asr', action='store_true', help="load asr for real-time app")
+    parser.add_argument('--asr_nogui', action='store_true', help="load asr for real-time app")
     parser.add_argument('--asr_wav', type=str, default='', help="load the wav and use as input")
     parser.add_argument('--asr_play', action='store_true', help="play out the audio")
 
@@ -163,7 +165,7 @@ if __name__ == '__main__':
 
     if opt.test:
         
-        if opt.gui:
+        if opt.gui or opt.asr_nogui:
             metrics = [] # use no metric in GUI for faster initialization...
         else:
             # metrics = [PSNRMeter(), LPIPSMeter(device=device)]
@@ -189,13 +191,13 @@ if __name__ == '__main__':
             # we still need test_loader to provide audio features for testing.
             with NeRFGUI(opt, trainer, test_loader) as gui:
                 gui.render()
-        
+        elif opt.asr_nogui:
+            with NeRFNoGUILive(opt, trainer, test_loader) as gui:
+                gui.render()
         else:
-            
             ### evaluate metrics (slow)
             if test_loader.has_gt:
                 trainer.evaluate(test_loader)
-
             ### test and save video (fast)  
             trainer.test(test_loader)
     
