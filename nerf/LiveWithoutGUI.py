@@ -122,7 +122,7 @@ class NeRFNoGUILive:
                     self.asr.run_step()
             fps, image = self.test_step()
             #print(fps)
-            cv2.putText(image, '%.2f' % fps, (5,50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            cv2.putText(image, '%.2f' % fps, (5,5), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
             cv2.imshow('MyLive', image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
