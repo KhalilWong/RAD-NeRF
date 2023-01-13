@@ -189,7 +189,7 @@ class NeRFRenderer(nn.Module):
 
         if enc_a is not None and self.smooth_lips:
             if self.enc_a is not None:
-                _lambda = 0.35
+                _lambda = 0.1#0.35
                 enc_a = _lambda * self.enc_a + (1 - _lambda) * enc_a
             self.enc_a = enc_a
 

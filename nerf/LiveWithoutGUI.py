@@ -8,6 +8,7 @@ from .utils import *
 from .asr import ASR
 
 import cv2
+import time
 
 class NeRFNoGUILive:
     def __init__(self, opt, trainer, data_loader, debug=True):
@@ -86,12 +87,16 @@ class NeRFNoGUILive:
                 except StopIteration:
                     self.loader = iter(self.data_loader)
                     data = next(self.loader)
-                
+                #s = time.time()
                 if self.opt.asr:
                     # use the live audio stream
                     data['auds'] = self.asr.get_next_feat()
+                #t = time.time()
+                #print('Next Feat:', t - s)
 
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
+                #tt = time.time()
+                #print('INFERE:', tt - t)
             
             ender.record()
             torch.cuda.synchronize()
@@ -116,13 +121,16 @@ class NeRFNoGUILive:
         while True:
             # update every frame
             # audio stream thread...
+            #s = time.time()
             if self.opt.asr and self.playing:
                 # run 2 ASR steps (audio is at 50FPS, video is at 25FPS)
                 for _ in range(2):
                     self.asr.run_step()
+            #t = time.time()
+            #print('ASR:', t - s)
             fps, image = self.test_step()
             #print(fps)
-            cv2.putText(image, '%.2f' % fps, (5,5), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            cv2.putText(image, '%.2f' % fps, (5,50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
             cv2.imshow('MyLive', image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break

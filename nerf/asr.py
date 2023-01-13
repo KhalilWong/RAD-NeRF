@@ -29,6 +29,7 @@ def _play_frame(stream, exit_event, queue, chunk):
             print(f'[INFO] play frame thread ends')
             break
         frame = queue.get()
+        print('OUT:', queue.qsize())
         frame = (frame * 32767).astype(np.int16).tobytes()
         stream.write(frame, chunk)
 
@@ -68,6 +69,7 @@ class ASR:
 
         self.exit_event = Event()
         self.audio_instance = pyaudio.PyAudio()
+        #print(self.audio_instance.get_default_output_device_info())
 
         # create input stream
         if self.mode == 'file':
@@ -89,8 +91,12 @@ class ASR:
 
         # create wav2vec model
         print(f'[INFO] loading ASR model {self.opt.asr_model}...')
-        self.processor = AutoProcessor.from_pretrained(opt.asr_model)
-        self.model = AutoModelForCTC.from_pretrained(opt.asr_model).to(self.device)
+        self.processor = AutoProcessor.from_pretrained('/home/ai/下载/RAD-NeRF/processor1/content/pretrained/')#, local_files_only = True)
+        #self.processor = AutoProcessor.from_pretrained('./wav2vec2')
+        #self.processor = AutoProcessor.from_pretrained(opt.asr_model)
+        self.model = AutoModelForCTC.from_pretrained('/home/ai/下载/RAD-NeRF/model1/content/pretrained2/').to(self.device)
+        #self.model = AutoModelForCTC.from_pretrained('./wav2vec2').to(self.device)
+        #self.model = AutoModelForCTC.from_pretrained(opt.asr_model).to(self.device)
 
         # prepare to save logits
         if self.opt.asr_save_feats:
@@ -159,7 +165,7 @@ class ASR:
 
     def get_next_feat(self):
         # return a [1/8, 16] window, for the next input to nerf side.
-        
+        #print('ATT_FEATS:', len(self.att_feats))
         while len(self.att_feats) < 8:
             # [------f+++t-----]
             if self.front < self.tail:
@@ -171,7 +177,7 @@ class ASR:
             self.front = (self.front + 2) % self.feat_queue.shape[0]
             self.tail = (self.tail + 2) % self.feat_queue.shape[0]
 
-            # print(self.front, self.tail, feat.shape)
+            print(self.front, self.tail, feat.shape)
 
             self.att_feats.append(feat.permute(1, 0))
         
@@ -183,7 +189,6 @@ class ASR:
         return att_feat
 
     def run_step(self):
-
         if self.terminated:
             return
 
@@ -196,9 +201,11 @@ class ASR:
             self.terminated = True
         else:
             self.frames.append(frame)
+            #print('Frames:', len(self.frames))
             # put to output
             if self.play:
                 self.output_queue.put(frame)
+                print('IN:', self.output_queue.qsize())
             # context not enough, do not run network.
             if len(self.frames) < self.stride_left_size + self.context_size + self.stride_right_size:
                 return
@@ -221,6 +228,8 @@ class ASR:
         end = start + feats.shape[0]
         self.feat_queue[start:end] = feats
         self.feat_buffer_idx = (self.feat_buffer_idx + 1) % self.feat_buffer_size
+        #print('FEAT_SHAPE:', feats.shape)
+        #print('START:', start, ', End:', end)
 
         # very naive, just concat the text output.
         if text != '':
@@ -232,6 +241,7 @@ class ASR:
             print(self.text)
             if self.opt.asr_save_feats:
                 print(f'[INFO] save all feats for training purpose... ')
+                #print(self.all_feats[:2])
                 feats = torch.cat(self.all_feats, dim=0) # [N, C]
                 # print('[INFO] before unfold', feats.shape)
                 window_size = 16
@@ -246,6 +256,7 @@ class ASR:
                     output_path = self.opt.asr_wav.replace('.wav', '_eo.npy')
                 else:
                     output_path = self.opt.asr_wav.replace('.wav', '.npy')
+                print('UNFOLD SIZE:', unfold_feats.shape)
                 np.save(output_path, unfold_feats.cpu().numpy())
                 print(f"[INFO] saved logits to {output_path}")
     
@@ -308,7 +319,7 @@ class ASR:
                 return None
         
         else:
-
+            #print('QUEUE:', self.queue.qsize())
             frame = self.queue.get()
             # print(f'[INFO] get frame {frame.shape}')
 
@@ -400,9 +411,9 @@ if __name__ == '__main__':
     # audio FPS
     parser.add_argument('--fps', type=int, default=50)
     # sliding window left-middle-right length.
-    parser.add_argument('-l', type=int, default=10)
-    parser.add_argument('-m', type=int, default=50)
-    parser.add_argument('-r', type=int, default=10)
+    parser.add_argument('-l', type=int, default=10)#10
+    parser.add_argument('-m', type=int, default=20)#50
+    parser.add_argument('-r', type=int, default=10)#10
     
     opt = parser.parse_args()
 

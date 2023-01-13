@@ -8,6 +8,8 @@ from .utils import *
 
 from .asr import ASR
 
+import cv2
+
 
 class OrbitCamera:
     def __init__(self, W, H, r=2, fovy=60):
@@ -186,6 +188,9 @@ class NeRFGUI:
                     data['auds'] = self.asr.get_next_feat()
 
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
+                #print(outputs['image'].shape)
+                cv2.imshow('MyLive', cv2.cvtColor(outputs['image'], cv2.COLOR_BGR2RGB))
+                cv2.waitKey(1)
 
                 # sync local camera pose
                 self.cam.update_pose(data['poses_matrix'][0].detach().cpu().numpy())
