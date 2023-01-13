@@ -10,6 +10,8 @@ from .asr import ASR
 import cv2
 import time
 
+from threading import Thread, Event
+
 class NeRFNoGUILive:
     def __init__(self, opt, trainer, data_loader, debug=True):
         self.opt = opt # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -19,6 +21,7 @@ class NeRFNoGUILive:
 
         self.trainer = trainer
         self.data_loader = data_loader
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         # override with dataloader's intrinsics
         self.W = data_loader._data.W
@@ -39,6 +42,12 @@ class NeRFNoGUILive:
 
         # control eye
         self.eye_area = None if not self.opt.exp_eye else data_loader._data.eye_area.mean().item()
+        #print(self.eye_area)
+        self.dynamic_area = self.eye_area
+        self.blinking = False
+        self.canblink = True
+        self.blinkspeed = 0.01
+        self.blinkdirect = -1
 
         # playing seq from dataloader, or pause.
         self.playing = True# False
@@ -87,13 +96,24 @@ class NeRFNoGUILive:
                 except StopIteration:
                     self.loader = iter(self.data_loader)
                     data = next(self.loader)
+                data['eye'] = torch.FloatTensor([0]).view(1, 1).to(self.device)
                 #s = time.time()
                 if self.opt.asr:
                     # use the live audio stream
                     data['auds'] = self.asr.get_next_feat()
                 #t = time.time()
                 #print('Next Feat:', t - s)
-
+                print('DATA EYE:', data['eye'])
+                if self.blinking:
+                    self.dynamic_area += self.blinkspeed * self.blinkdirect
+                    if self.dynamic_area < 0:
+                        self.dynamic_area = 0
+                        self.blinkdirect *= -1
+                    elif self.dynamic_area > self.eye_area:
+                        self.dynamic_area = self.eye_area
+                        self.blinkdirect *= -1
+                        self.blinking = False
+                    data['eye'] = torch.FloatTensor([0]).view(1, 1).to(self.device)
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
                 #tt = time.time()
                 #print('INFERE:', tt - t)
@@ -118,6 +138,7 @@ class NeRFNoGUILive:
     def render(self):
         if self.opt.asr:
             self.asr.warm_up()
+        Thread(target=self.BlinkCtrl).start()
         while True:
             # update every frame
             # audio stream thread...
@@ -134,6 +155,14 @@ class NeRFNoGUILive:
             cv2.imshow('MyLive', image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+        self.canblink = False
         if self.opt.asr:
             self.asr.stop()
         cv2.destroyAllWindows()
+    
+    def BlinkCtrl(self):
+        while self.canblink:
+            print('是否眨眼: y or n')
+            text = input()
+            if text == 'y':
+                self.blinking = True
