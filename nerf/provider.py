@@ -660,6 +660,8 @@ class NeRFDataset:
 
         if self.opt.exp_eye:
             results['eye'] = self.eye_area[index].to(self.device) # [1]
+            #print('[provider.py][results-index]: ', results['index'])
+            #print('[provider.py][results-eye]: ', results['eye'])
         else:
             results['eye'] = None
 
@@ -731,5 +733,5 @@ class NeRFDataset:
 
         # do evaluate if has gt images and use self-driven setting
         loader.has_gt = (self.opt.aud == '')
-
-        return loader        
+        
+        return loader
