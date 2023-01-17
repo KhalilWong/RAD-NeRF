@@ -309,7 +309,7 @@ class NeRFDataset_Test:
 
 
 class NeRFDataset:
-    def __init__(self, opt, device, type='train', downscale=1):
+    def __init__(self, opt, device, type='train', downscale=1, eye_min = 0.0, eye_max = 0.5):
         super().__init__()
         
         self.opt = opt
@@ -322,6 +322,9 @@ class NeRFDataset:
         self.offset = opt.offset # camera offset
         self.bound = opt.bound # bounding box half length, also used as the radius to random sample poses.
         self.fp16 = opt.fp16
+
+        self.out_eye_min = eye_min
+        self.out_eye_max = eye_max
 
         self.start_index = opt.data_range[0]
         self.end_index = opt.data_range[1]
@@ -550,6 +553,13 @@ class NeRFDataset:
         if self.opt.exp_eye:
             self.eye_area = np.array(self.eye_area, dtype=np.float32) # [N]
             print(f'[INFO] eye_area: {self.eye_area.min()} - {self.eye_area.max()}')
+
+            if self.type == 'train':
+                self.out_eye_min = self.eye_area.min()
+                self.out_eye_max = self.eye_area.max()
+            self.eye_area -= self.out_eye_min
+            self.eye_area *= 0.5 / self.out_eye_max
+            print(f'[INFO] new_eye_area: {self.eye_area.min()} - {self.eye_area.max()}')
 
             if self.opt.smooth_eye:
 

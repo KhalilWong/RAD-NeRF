@@ -205,8 +205,8 @@ if __name__ == '__main__':
     else:
 
         optimizer = lambda model: torch.optim.Adam(model.get_params(opt.lr, opt.lr_net), betas=(0.9, 0.99), eps=1e-15)
-
-        train_loader = NeRFDataset(opt, device=device, type='train').dataloader()
+        train_data = NeRFDataset(opt, device=device, type='train')
+        train_loader = train_data.dataloader()
 
         assert len(train_loader) < opt.ind_num, f"[ERROR] dataset too many frames: {len(train_loader)}, please increase --ind_num to this number!"
 
@@ -231,7 +231,7 @@ if __name__ == '__main__':
                 gui.render()
         
         else:
-            valid_loader = NeRFDataset(opt, device=device, type='val', downscale=1).dataloader()
+            valid_loader = NeRFDataset(opt, device=device, type='val', downscale=1, eye_min=train_data.out_eye_min, eye_max=train_data.out_eye_max).dataloader()
 
             max_epoch = np.ceil(opt.iters / len(train_loader)).astype(np.int32)
             print(f'[INFO] max_epoch = {max_epoch}')
@@ -242,7 +242,7 @@ if __name__ == '__main__':
             torch.cuda.empty_cache()
 
             # also test
-            test_loader = NeRFDataset(opt, device=device, type='test').dataloader()
+            test_loader = NeRFDataset(opt, device=device, type='test', eye_min=train_data.out_eye_min, eye_max=train_data.out_eye_max).dataloader()
             
             if test_loader.has_gt:
                 trainer.evaluate(test_loader) # blender has gt, so evaluate it.
