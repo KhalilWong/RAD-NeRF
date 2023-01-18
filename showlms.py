@@ -28,5 +28,6 @@ def showlms(root_path):
             #print(file.replace('lms', 'jpg'))
             cv2.imwrite(os.path.join(root_path, 'ori_imgs', 'LMSFRAMES', file.replace('lms', 'jpg')), img)
 
+
 if __name__ == '__main__':
     showlms('data/shiying')
