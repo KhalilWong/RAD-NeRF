@@ -29,7 +29,7 @@ def _play_frame(stream, exit_event, queue, chunk):
             print(f'[INFO] play frame thread ends')
             break
         frame = queue.get()
-        #print('OUT:', queue.qsize())
+        print('OUT:', queue.qsize())
         frame = (frame * 32767).astype(np.int16).tobytes()
         stream.write(frame, chunk)
 
@@ -51,6 +51,7 @@ class ASR:
             self.mode = 'dyfile'
         elif opt.asr_nogui == 2:
             self.mode = 'tts'
+        self.outaudio = False
 
         if 'esperanto' in self.opt.asr_model:
             self.audio_dim = 392#44
@@ -213,9 +214,9 @@ class ASR:
             self.frames.append(frame)
             #print('Frames:', len(self.frames))
             # put to output
-            if self.play:
+            if self.play and self.outaudio:
                 self.output_queue.put(frame)
-                #print('IN:', self.output_queue.qsize())
+                print('IN:', self.output_queue.qsize())
             # context not enough, do not run network.
             if len(self.frames) < self.stride_left_size + self.context_size + self.stride_right_size:
                 return
@@ -336,8 +337,10 @@ class ASR:
                 self.idx = self.idx + self.chunk
                 return frame
             else:
+                self.outaudio = False
                 self.file_stream = self.create_file_stream()
                 if self.opt.asr_wav != '':
+                    self.outaudio = True
                     self.opt.asr_wav = ''
                 self.idx = 0
                 frame = self.file_stream[self.idx: self.idx + self.chunk]
