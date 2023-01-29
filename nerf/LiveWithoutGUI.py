@@ -64,8 +64,9 @@ class NeRFNoGUILive:
         self.ind_num = trainer.model.individual_codes.shape[0]
 
         # build asr
-        if self.opt.asr:
-            self.asr = ASR(opt)
+        # if self.opt.asr:
+        #     self.asr = ASR(opt)
+        self.asr = ASR(opt)
         
         # self.test_step()
         
