@@ -98,12 +98,7 @@ class NeRFNoGUILive:
                     self.loader = iter(self.data_loader)
                     data = next(self.loader)
                 data['eye'] = torch.FloatTensor([self.eye_area]).view(1, 1).to(self.device)
-                #s = time.time()
-                if self.opt.asr:
-                    # use the live audio stream
-                    data['auds'] = self.asr.get_next_feat()
-                #t = time.time()
-                #print('Next Feat:', t - s)
+                data['auds'] = self.asr.get_next_feat()
                 if self.blinking:
                     self.dynamic_area += self.blinkspeed * self.blinkdirect
                     if self.dynamic_area < 0:
@@ -116,8 +111,6 @@ class NeRFNoGUILive:
                     data['eye'] = torch.FloatTensor([self.dynamic_area]).view(1, 1).to(self.device)
                 #print('DATA EYE:', data['eye'])
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
-                #tt = time.time()
-                #print('INFERE:', tt - t)
             
             ender.record()
             torch.cuda.synchronize()
@@ -137,14 +130,13 @@ class NeRFNoGUILive:
             return int(1000/t), cv2.cvtColor(self.render_buffer, cv2.COLOR_BGR2RGB)
 
     def render(self):
-        if self.opt.asr:
-            self.asr.warm_up()
+        self.asr.warm_up()
         Thread(target=self.BlinkCtrl).start()
         while True:
             # update every frame
             # audio stream thread...
             #s = time.time()
-            if self.opt.asr and self.playing:
+            if self.playing:
                 # run 2 ASR steps (audio is at 50FPS, video is at 25FPS)
                 for _ in range(2):
                     self.asr.run_step()
@@ -157,13 +149,17 @@ class NeRFNoGUILive:
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
         self.canblink = False
-        if self.opt.asr:
-            self.asr.stop()
+        self.asr.stop()
         cv2.destroyAllWindows()
     
     def BlinkCtrl(self):
         while self.canblink:
-            print('是否眨眼: y or n')
+            print('眨眼：y or n, 音频路径：wav path')
             text = input()
-            if text == 'y':
-                self.blinking = True
+            tlist = text.split(',')
+            if len(tlist) > 1:
+                if tlist[0] == 'y':
+                    self.blinking = True
+                if len(tlist) > 2:
+                    if tlist[1] != '':
+                        self.asr.opt.asr_wav = tlist[1]

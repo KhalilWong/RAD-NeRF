@@ -93,7 +93,7 @@ if __name__ == '__main__':
 
     # asr
     parser.add_argument('--asr', action='store_true', help="load asr for real-time app")
-    parser.add_argument('--asr_nogui', action='store_true', help="load asr for real-time app")
+    parser.add_argument('--asr_nogui', type=int, default=-1, help="0-mic, 1-wav, 2-text")
     parser.add_argument('--asr_wav', type=str, default='', help="load the wav and use as input")
     parser.add_argument('--asr_play', action='store_true', help="play out the audio")
 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
 
     if opt.test:
         
-        if opt.gui or opt.asr_nogui:
+        if opt.gui or opt.asr_nogui != -1:
             metrics = [] # use no metric in GUI for faster initialization...
         else:
             # metrics = [PSNRMeter(), LPIPSMeter(device=device)]
@@ -191,7 +191,7 @@ if __name__ == '__main__':
             # we still need test_loader to provide audio features for testing.
             with NeRFGUI(opt, trainer, test_loader) as gui:
                 gui.render()
-        elif opt.asr_nogui:
+        elif opt.asr_nogui != -1:
             with NeRFNoGUILive(opt, trainer, test_loader) as gui:
                 gui.render()
                 print('Start Living')

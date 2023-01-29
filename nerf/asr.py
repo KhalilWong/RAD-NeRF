@@ -45,6 +45,12 @@ class ASR:
         self.sample_rate = 16000
         self.chunk = self.sample_rate // self.fps # 320 samples per chunk (20ms * 16000 / 1000)
         self.mode = 'live' if opt.asr_wav == '' else 'file'
+        if opt.asr_nogui == 0:
+            self.mode = 'live'
+        elif opt.asr_nogui == 1:
+            self.mode = 'dyfile'
+        elif opt.asr_nogui == 2:
+            self.mode = 'tts'
 
         if 'esperanto' in self.opt.asr_model:
             self.audio_dim = 392#44
@@ -73,6 +79,8 @@ class ASR:
 
         # create input stream
         if self.mode == 'file':
+            self.file_stream = self.create_file_stream()
+        elif self.mode == 'dyfile':
             self.file_stream = self.create_file_stream()
         else:
             # start a background process to read frames
@@ -263,9 +271,12 @@ class ASR:
                 print(f"[INFO] saved logits to {output_path}")
     
     def create_file_stream(self):
-    
-        stream, sample_rate = sf.read(self.opt.asr_wav) # [T*sample_rate,] float64
-        stream = stream.astype(np.float32)
+        if self.opt.asr_wav == '':
+            sample_rate = 16000
+            stream = np.zeros(sample_rate * 1)
+        else:
+            stream, sample_rate = sf.read(self.opt.asr_wav) # [T*sample_rate,] float64
+            stream = stream.astype(np.float32)
 
         if stream.ndim > 1:
             print(f'[WARN] audio has {stream.shape[1]} channels, only use the first.')
@@ -319,6 +330,19 @@ class ASR:
                 return frame
             else:
                 return None
+        elif self.mode == 'dyfile':
+            if self.idx < self.file_stream.shape[0]:
+                frame = self.file_stream[self.idx: self.idx + self.chunk]
+                self.idx = self.idx + self.chunk
+                return frame
+            else:
+                if self.opt.asr_wav != '':
+                    self.file_stream = self.create_file_stream()
+                    self.opt.asr_wav = ''
+                self.idx = 0
+                frame = self.file_stream[self.idx: self.idx + self.chunk]
+                self.idx = self.idx + self.chunk
+                return frame
         
         else:
             #print('QUEUE:', self.queue.qsize())
