@@ -157,9 +157,9 @@ class NeRFNoGUILive:
             print('眨眼：y or n, 音频路径：wav path')
             text = input()
             tlist = text.split(',')
-            if len(tlist) > 1:
+            if len(tlist) > 0:
                 if tlist[0] == 'y':
                     self.blinking = True
-                if len(tlist) > 2:
+                if len(tlist) > 1:
                     if tlist[1] != '':
                         self.asr.opt.asr_wav = tlist[1]

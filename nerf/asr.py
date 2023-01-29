@@ -286,7 +286,7 @@ class ASR:
             print(f'[WARN] audio sample rate is {sample_rate}, resampling into {self.sample_rate}.')
             stream = resampy.resample(x=stream, sr_orig=sample_rate, sr_new=self.sample_rate)
 
-        print(f'[INFO] loaded audio stream {self.opt.asr_wav}: {stream.shape}')
+        #print(f'[INFO] loaded audio stream {self.opt.asr_wav}: {stream.shape}')
 
         return stream
 
@@ -336,8 +336,8 @@ class ASR:
                 self.idx = self.idx + self.chunk
                 return frame
             else:
+                self.file_stream = self.create_file_stream()
                 if self.opt.asr_wav != '':
-                    self.file_stream = self.create_file_stream()
                     self.opt.asr_wav = ''
                 self.idx = 0
                 frame = self.file_stream[self.idx: self.idx + self.chunk]
