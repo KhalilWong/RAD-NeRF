@@ -210,7 +210,8 @@ class NeRFRenderer(nn.Module):
             self.local_step += 1
 
             xyzs, dirs, deltas, rays = raymarching.march_rays_train(rays_o, rays_d, self.bound, self.density_bitfield, self.cascade, self.grid_size, nears, fars, counter, self.mean_count, perturb, 128, force_all_rays, dt_gamma, max_steps)
-            
+            #print('[render.py][eye]: ', eye)
+            #print('[render.py][eye_area]: ', self.eye_area[self.local_step])
             sigmas, rgbs, ambient = self(xyzs, dirs, enc_a, ind_code, eye)
             sigmas = self.density_scale * sigmas
 
@@ -249,6 +250,7 @@ class NeRFRenderer(nn.Module):
                 n_step = max(min(N // n_alive, 8), 1)
 
                 xyzs, dirs, deltas = raymarching.march_rays(n_alive, n_step, rays_alive, rays_t, rays_o, rays_d, self.bound, self.density_bitfield, self.cascade, self.grid_size, nears, fars, 128, perturb if step == 0 else False, dt_gamma, max_steps)
+                #print('Renderer: ', eye)
 
                 sigmas, rgbs, ambient = self(xyzs, dirs, enc_a, ind_code, eye)
                 sigmas = self.density_scale * sigmas

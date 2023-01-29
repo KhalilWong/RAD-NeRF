@@ -182,11 +182,10 @@ class NeRFGUI:
                 except StopIteration:
                     self.loader = iter(self.data_loader)
                     data = next(self.loader)
-                
                 if self.opt.asr:
                     # use the live audio stream
                     data['auds'] = self.asr.get_next_feat()
-
+                #data['eye'] = torch.FloatTensor([1.0]).view(1, 1).to('cuda')
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
                 #print(outputs['image'].shape)
                 cv2.imshow('MyLive', cv2.cvtColor(outputs['image'], cv2.COLOR_BGR2RGB))

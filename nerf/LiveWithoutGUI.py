@@ -96,14 +96,13 @@ class NeRFNoGUILive:
                 except StopIteration:
                     self.loader = iter(self.data_loader)
                     data = next(self.loader)
-                data['eye'] = torch.FloatTensor([0]).view(1, 1).to(self.device)
+                data['eye'] = torch.FloatTensor([self.eye_area]).view(1, 1).to(self.device)
                 #s = time.time()
                 if self.opt.asr:
                     # use the live audio stream
                     data['auds'] = self.asr.get_next_feat()
                 #t = time.time()
                 #print('Next Feat:', t - s)
-                print('DATA EYE:', data['eye'])
                 if self.blinking:
                     self.dynamic_area += self.blinkspeed * self.blinkdirect
                     if self.dynamic_area < 0:
@@ -113,7 +112,8 @@ class NeRFNoGUILive:
                         self.dynamic_area = self.eye_area
                         self.blinkdirect *= -1
                         self.blinking = False
-                    data['eye'] = torch.FloatTensor([0]).view(1, 1).to(self.device)
+                    data['eye'] = torch.FloatTensor([self.dynamic_area]).view(1, 1).to(self.device)
+                #print('DATA EYE:', data['eye'])
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
                 #tt = time.time()
                 #print('INFERE:', tt - t)

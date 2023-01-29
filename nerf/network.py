@@ -112,7 +112,7 @@ class NeRFNetwork(NeRFRenderer):
         self.emb = self.opt.emb
 
         if 'esperanto' in self.opt.asr_model:
-            self.audio_in_dim = 44
+            self.audio_in_dim = 392#44
         elif 'deepspeech' in self.opt.asr_model:
             self.audio_in_dim = 29
         else:
@@ -253,6 +253,7 @@ class NeRFNetwork(NeRFRenderer):
         # ender.record(); torch.cuda.synchronize(); curr_time = starter.elapsed_time(ender); print(f"encoder = {curr_time}"); starter.record()
 
         if e is not None:
+            #print('[network.py][e]: ', e)
             h = torch.cat([enc_x, enc_w, e.repeat(x.shape[0], 1)], dim=-1)
         else:
             h = torch.cat([enc_x, enc_w], dim=-1)

@@ -29,7 +29,7 @@ def _play_frame(stream, exit_event, queue, chunk):
             print(f'[INFO] play frame thread ends')
             break
         frame = queue.get()
-        print('OUT:', queue.qsize())
+        #print('OUT:', queue.qsize())
         frame = (frame * 32767).astype(np.int16).tobytes()
         stream.write(frame, chunk)
 
@@ -47,7 +47,7 @@ class ASR:
         self.mode = 'live' if opt.asr_wav == '' else 'file'
 
         if 'esperanto' in self.opt.asr_model:
-            self.audio_dim = 44
+            self.audio_dim = 392#44
         elif 'deepspeech' in self.opt.asr_model:
             self.audio_dim = 29
         else:
@@ -91,10 +91,12 @@ class ASR:
 
         # create wav2vec model
         print(f'[INFO] loading ASR model {self.opt.asr_model}...')
-        self.processor = AutoProcessor.from_pretrained('/home/ai/下载/RAD-NeRF/processor1/content/pretrained/')#, local_files_only = True)
+        self.processor = AutoProcessor.from_pretrained('/home/ai/下载/RAD-NeRF/espeak-cv-ft/processor/content/pretrained/')
+        #self.processor = AutoProcessor.from_pretrained('/home/ai/下载/RAD-NeRF/processor1/content/pretrained/')#, local_files_only = True)
         #self.processor = AutoProcessor.from_pretrained('./wav2vec2')
         #self.processor = AutoProcessor.from_pretrained(opt.asr_model)
-        self.model = AutoModelForCTC.from_pretrained('/home/ai/下载/RAD-NeRF/model1/content/pretrained2/').to(self.device)
+        self.model = AutoModelForCTC.from_pretrained('/home/ai/下载/RAD-NeRF/espeak-cv-ft/model/content/pretrained2').to(self.device)
+        #self.model = AutoModelForCTC.from_pretrained('/home/ai/下载/RAD-NeRF/model1/content/pretrained2/').to(self.device)
         #self.model = AutoModelForCTC.from_pretrained('./wav2vec2').to(self.device)
         #self.model = AutoModelForCTC.from_pretrained(opt.asr_model).to(self.device)
 
@@ -177,7 +179,7 @@ class ASR:
             self.front = (self.front + 2) % self.feat_queue.shape[0]
             self.tail = (self.tail + 2) % self.feat_queue.shape[0]
 
-            print(self.front, self.tail, feat.shape)
+            #print(self.front, self.tail, feat.shape)
 
             self.att_feats.append(feat.permute(1, 0))
         
@@ -205,7 +207,7 @@ class ASR:
             # put to output
             if self.play:
                 self.output_queue.put(frame)
-                print('IN:', self.output_queue.qsize())
+                #print('IN:', self.output_queue.qsize())
             # context not enough, do not run network.
             if len(self.frames) < self.stride_left_size + self.context_size + self.stride_right_size:
                 return
@@ -412,7 +414,7 @@ if __name__ == '__main__':
     parser.add_argument('--fps', type=int, default=50)
     # sliding window left-middle-right length.
     parser.add_argument('-l', type=int, default=10)#10
-    parser.add_argument('-m', type=int, default=20)#50
+    parser.add_argument('-m', type=int, default=50)#50
     parser.add_argument('-r', type=int, default=10)#10
     
     opt = parser.parse_args()

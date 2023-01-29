@@ -737,7 +737,7 @@ class Trainer(object):
             rgb[..., :3] = srgb_to_linear(rgb[..., :3])
          
         bg_color = data['bg_color']
-        
+        #print('[util.py][eye]: ', eye)
         outputs = self.model.render(rays_o, rays_d, auds, bg_coords, poses, eye=eye, index=index, staged=False, bg_color=bg_color, perturb=True, force_all_rays=False if (self.opt.patch_size <= 1 and not self.opt.train_camera) else True, **vars(self.opt))
 
         if not self.opt.torso:
@@ -763,7 +763,7 @@ class Trainer(object):
             # torch_vis_2d(pred_rgb[0])
 
             # LPIPS loss
-            loss = loss + 0.01 * self.criterion_lpips(pred_rgb, rgb)
+            loss = loss + 0.01 * self.criterion_lpips(pred_rgb, rgb)#0.01
         
         # flip every step... if finetune lips
         if self.flip_finetune_lips:

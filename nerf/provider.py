@@ -558,7 +558,7 @@ class NeRFDataset:
                 self.out_eye_min = self.eye_area.min()
                 self.out_eye_max = self.eye_area.max()
             self.eye_area -= self.out_eye_min
-            self.eye_area *= 0.5 / self.out_eye_max
+            self.eye_area *= 0.5 / (self.out_eye_max - self.out_eye_min)
             print(f'[INFO] new_eye_area: {self.eye_area.min()} - {self.eye_area.max()}')
 
             if self.opt.smooth_eye:
