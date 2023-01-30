@@ -73,7 +73,6 @@ class ASR:
         if self.stride_left_size > 0:
             self.frames.extend([np.zeros(self.chunk, dtype=np.float32)] * self.stride_left_size)
 
-
         self.exit_event = Event()
         self.audio_instance = pyaudio.PyAudio()
         #print(self.audio_instance.get_default_output_device_info())
@@ -82,6 +81,9 @@ class ASR:
         if self.mode == 'file':
             self.file_stream = self.create_file_stream()
         elif self.mode == 'dyfile':
+            self.file_stream = self.create_file_stream()
+        elif self.mode == 'tts':
+            self.tts_queue = Queue()
             self.file_stream = self.create_file_stream()
         else:
             # start a background process to read frames
@@ -160,7 +162,6 @@ class ASR:
             if self.listening:
                 self.process_read_frame.join()
                 self.listening = False
-
 
     def __enter__(self):
         return self
@@ -276,9 +277,11 @@ class ASR:
             sample_rate = 16000
             stream = np.zeros(sample_rate * 1)
         else:
-            stream, sample_rate = sf.read(self.opt.asr_wav) # [T*sample_rate,] float64
-            stream = stream.astype(np.float32)
-
+            if self.opt.asr_nogui != 2:
+                stream, sample_rate = sf.read(self.opt.asr_wav) # [T*sample_rate,] float64
+                stream = stream.astype(np.float32)
+            else:
+                stream = (np.frombuffer(self.opt.asr_wav, dtype=np.uint16).astype(np.float32) - 32768) / 32768
         if stream.ndim > 1:
             print(f'[WARN] audio has {stream.shape[1]} channels, only use the first.')
             stream = stream[:, 0]
@@ -290,7 +293,6 @@ class ASR:
         #print(f'[INFO] loaded audio stream {self.opt.asr_wav}: {stream.shape}')
 
         return stream
-
 
     def create_pyaudio_stream(self):
 
@@ -320,7 +322,6 @@ class ASR:
         
         return audio, stream
 
-    
     def get_audio_frame(self):
 
         if self.mode == 'file':
@@ -346,7 +347,23 @@ class ASR:
                 frame = self.file_stream[self.idx: self.idx + self.chunk]
                 self.idx = self.idx + self.chunk
                 return frame
-        
+        elif self.mode == 'tts':
+            if self.idx < self.file_stream.shape[0]:
+                frame = self.file_stream[self.idx: self.idx + self.chunk]
+                self.idx = self.idx + self.chunk
+                return frame
+            else:
+                self.outaudio = False
+                if not self.tts_queue.empty():
+                    self.opt.asr_wav = self.tts_queue.get()
+                self.file_stream = self.create_file_stream()
+                if self.opt.asr_wav != '':
+                    self.outaudio = True
+                    self.opt.asr_wav = ''
+                self.idx = 0
+                frame = self.file_stream[self.idx: self.idx + self.chunk]
+                self.idx = self.idx + self.chunk
+                return frame
         else:
             #print('QUEUE:', self.queue.qsize())
             frame = self.queue.get()
@@ -356,7 +373,6 @@ class ASR:
 
             return frame
 
-        
     def frame_to_text(self, frame):
         # frame: [N * 320], N = (context_size + 2 * stride_size)
         
@@ -392,7 +408,6 @@ class ASR:
 
         return logits[0], predicted_ids[0], transcription # [N,]
 
-
     def run(self):
 
         self.listen()
@@ -423,9 +438,6 @@ class ASR:
 
         self.clear_queue()
 
-            
-
-
 if __name__ == '__main__':
     import argparse
 
@@ -451,6 +463,7 @@ if __name__ == '__main__':
     opt.asr_play = opt.play
     opt.asr_model = opt.model
     opt.asr_save_feats = opt.save_feats
+    opt.asr_nogui = -1
 
     if 'deepspeech' in opt.asr_model:
         raise ValueError("DeepSpeech features should not use this code to extract...")

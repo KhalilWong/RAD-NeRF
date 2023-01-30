@@ -9,6 +9,11 @@ from .asr import ASR
 
 import cv2
 import time
+import re
+
+from azure.cognitiveservices.speech import AudioDataStream, SpeechConfig, SpeechSynthesizer, SpeechSynthesisOutputFormat
+from azure.cognitiveservices.speech.audio import AudioOutputConfig
+import azure.cognitiveservices.speech as speechsdk
 
 from threading import Thread, Event
 
@@ -151,7 +156,18 @@ class NeRFNoGUILive:
         self.canblink = False
         self.asr.stop()
         cv2.destroyAllWindows()
-    
+    ###############################################################################################
+    def InitTTS(self):
+        speech_key, service_region = "41e78ceb208e49e9884e54b1f664f22b", "eastasia"
+        speech_config = speechsdk.SpeechConfig(subscription = speech_key, region = service_region)
+
+        speech_config.speech_synthesis_language = "zh-CN"
+        speech_config.speech_synthesis_voice_name ="zh-CN-XiaochenNeural"
+
+        audio_config = AudioOutputConfig(filename = 'tts.wav')
+        synthesizer = SpeechSynthesizer(speech_config = speech_config, audio_config = None)
+        return synthesizer
+    ###############################################################################################
     def BlinkCtrl(self):
         while self.canblink:
             print('眨眼：y or n, 音频路径：wav path')
@@ -162,4 +178,21 @@ class NeRFNoGUILive:
                     self.blinking = True
                 if len(tlist) > 1:
                     if tlist[1] != '':
-                        self.asr.opt.asr_wav = tlist[1]
+                        if self.opt.asr_nogui == 1:
+                            self.asr.opt.asr_wav = tlist[1]
+                        elif self.opt.asr_nogui == 2:
+                            synthesizer = self.InitTTS()
+                            self.Text2Audio(synthesizer, tlist[1])
+    ###############################################################################################
+    def Text2Audio(self, in_synthesizer, text):
+        TTSFrames = re.split('[.][\s]+|[。][\s]*|[\n][\s]*', text)
+        #print(TTSFrames)
+        for i in range(len(TTSFrames)):
+            if TTSFrames[i] == '':
+                continue
+            while 1:
+                result = in_synthesizer.speak_text_async(TTSFrames[i]).get()
+                if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+                    break
+            self.asr.tts_queue.append(result.audio_data[256:-30])
+            time.sleep(0.5)
