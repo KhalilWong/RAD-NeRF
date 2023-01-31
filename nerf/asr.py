@@ -93,7 +93,7 @@ class ASR:
         
         # play out the audio too...?
         if self.play:
-            self.output_stream = self.audio_instance.open(format=pyaudio.paInt16, channels=1, rate=self.sample_rate, input=False, output=True, frames_per_buffer=self.chunk)
+            self.output_stream = self.audio_instance.open(format=pyaudio.paInt16, channels=1, rate=self.sample_rate, input=False, output=True, frames_per_buffer=self.chunk * 10)# pyaudio pcm buffer
             self.output_queue = Queue()
             self.process_play_frame = Thread(target=_play_frame, args=(self.output_stream, self.exit_event, self.output_queue, self.chunk))
 
@@ -281,7 +281,10 @@ class ASR:
                 stream, sample_rate = sf.read(self.opt.asr_wav) # [T*sample_rate,] float64
                 stream = stream.astype(np.float32)
             else:
-                stream = (np.frombuffer(self.opt.asr_wav, dtype=np.uint16).astype(np.float32) - 32768) / 32768
+                print(np.frombuffer(self.opt.asr_wav, dtype=np.uint16).shape)
+                sample_rate = 24000
+                #stream = (np.frombuffer(self.opt.asr_wav, dtype=np.uint16).astype(np.float32) - 32768) / 32768
+                stream = (np.frombuffer(self.opt.asr_wav, dtype=np.int16).astype(np.float32) ) / 32768
         if stream.ndim > 1:
             print(f'[WARN] audio has {stream.shape[1]} channels, only use the first.')
             stream = stream[:, 0]
@@ -349,7 +352,10 @@ class ASR:
                 return frame
         elif self.mode == 'tts':
             if self.idx < self.file_stream.shape[0]:
-                frame = self.file_stream[self.idx: self.idx + self.chunk]
+                if self.idx + self.chunk > self.file_stream.shape[0]:
+                    frame = self.file_stream[self.idx:]
+                else:
+                    frame = self.file_stream[self.idx: self.idx + self.chunk]
                 self.idx = self.idx + self.chunk
                 return frame
             else:

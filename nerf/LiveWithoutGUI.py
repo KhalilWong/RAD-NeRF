@@ -163,14 +163,18 @@ class NeRFNoGUILive:
 
         speech_config.speech_synthesis_language = "zh-CN"
         speech_config.speech_synthesis_voice_name ="zh-CN-XiaochenNeural"
+        
+        #speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Raw24Khz16BitMonoPcm)
+        speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Raw24Khz16BitMonoPcm)
+        #print('sssssssss', speech_config.output_format)
 
-        audio_config = AudioOutputConfig(filename = 'tts.wav')
-        synthesizer = SpeechSynthesizer(speech_config = speech_config, audio_config = None)
+        audio_config = AudioOutputConfig(use_default_speaker=True)
+        synthesizer = SpeechSynthesizer(speech_config = speech_config, audio_config = audio_config)
         return synthesizer
     ###############################################################################################
     def BlinkCtrl(self):
         while self.canblink:
-            print('眨眼：y or n, 音频路径：wav path')
+            print('眨眼：y or n, 音频(路径或文本）')
             text = input()
             tlist = text.split(',')
             if len(tlist) > 0:
@@ -186,13 +190,14 @@ class NeRFNoGUILive:
     ###############################################################################################
     def Text2Audio(self, in_synthesizer, text):
         TTSFrames = re.split('[.][\s]+|[。][\s]*|[\n][\s]*', text)
-        #print(TTSFrames)
+        print(TTSFrames)
         for i in range(len(TTSFrames)):
             if TTSFrames[i] == '':
                 continue
             while 1:
                 result = in_synthesizer.speak_text_async(TTSFrames[i]).get()
+                #print(result.properties.get_property(0))
                 if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
                     break
-            self.asr.tts_queue.append(result.audio_data[256:-30])
+            self.asr.tts_queue.put(result.audio_data[256:-30])#16, -30
             time.sleep(0.5)
