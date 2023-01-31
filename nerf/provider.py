@@ -562,7 +562,6 @@ class NeRFDataset:
             print(f'[INFO] new_eye_area: {self.eye_area.min()} - {self.eye_area.max()}')
 
             if self.opt.smooth_eye:
-
                 # naive 5 window average
                 ori_eye = self.eye_area.copy()
                 for i in range(ori_eye.shape[0]):
