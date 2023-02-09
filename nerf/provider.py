@@ -25,6 +25,24 @@ def nerf_matrix_to_ngp(pose, scale=0.33, offset=[0, 0, 0]):
     ], dtype=np.float32)
     return new_pose
 
+def random_pose(pose, pose_direction, current_angle, target_angle, scale=0.33, offset=[0, 0, 0]):
+    new_pose = np.array([
+        [0, -1, 0, 0 * scale + offset[0]],
+        [0, 0, -1, pose[2, 3] * scale + offset[1]],
+        [1, 0, 0, 0 * scale + offset[2]],
+        [0, 0, 0, 1],
+    ], dtype=np.float32)
+    if current_angle == target_angle:
+        target_angle = [np.rand() * 0.1 * np.pi, np.rand() * 2.0 * np.pi]
+        pose_direction = target_angle - current_angle
+    current_angle += 0.1 * pose_direction
+    d_pose = np.array([
+        [-np.cos(current_angle[1]) * np.sin(current_angle[0]), -np.cos(current_angle[0]), -np.sin(current_angle[1]) * np.sin(current_angle[0]), 0],
+        [-np.cos(current_angle[1]) * np.sin(current_angle[0]), -np.sin(current_angle[1]) * np.sin(current_angle[0]), -np.cos(current_angle[0]), 0],
+        [np.cos(current_angle[0]), -np.cos(current_angle[1]) * np.sin(current_angle[0]), -np.sin(current_angle[1]) * np.sin(current_angle[0]), 0],
+        [0, 0, 0, 1],
+    ], dtype=np.float32)
+    return new_pose, pose_direction, current_angle, target_angle
 
 def smooth_camera_path(poses, kernel_size=5):
     # smooth the camera trajectory...
@@ -422,6 +440,9 @@ class NeRFDataset:
         self.images = []
 
         self.poses = []
+        self.pose_direction = [0., 0.]
+        self.current_angle = [0., 0.]
+        self.target_angle = [0., 0.]
         self.exps = []
 
         self.auds = []
@@ -645,8 +666,10 @@ class NeRFDataset:
 
         # head pose and bg image may mirror (replay --> <-- --> <--).
         index[0] = self.mirror_index(index[0])
-
-        poses = self.poses[index].to(self.device) # [B, 4, 4]
+        if self.opt.test:
+            poses = random_pose(self.pose_direction, self.current_angle, self.target_angle).to(self.device)
+        else:
+            poses = self.poses[index].to(self.device) # [B, 4, 4]
         
         if self.training and self.opt.finetune_lips:
             rect = self.lips_rect[index[0]]
