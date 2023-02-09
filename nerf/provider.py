@@ -17,32 +17,66 @@ from .utils import get_audio_features, get_rays, get_bg_coords, convert_poses
 
 # ref: https://github.com/NVlabs/instant-ngp/blob/b76004c8cf478880227401ae763be4c02f80b62f/include/neural-graphics-primitives/nerf_loader.h#L50
 def nerf_matrix_to_ngp(pose, scale=0.33, offset=[0, 0, 0]):
+    #new_pose = np.array([
+    #    [pose[1, 0], -pose[1, 1], -pose[1, 2], pose[1, 3] * scale + offset[0]],
+    #    [pose[2, 0], -pose[2, 1], -pose[2, 2], pose[2, 3] * scale + offset[1]],
+    #    [pose[0, 0], -pose[0, 1], -pose[0, 2], pose[0, 3] * scale + offset[2]],
+    #    [0, 0, 0, 1],
+    #], dtype=np.float32)
+    #print(pose[0, 0] ** 2 + pose[0, 1] ** 2 + pose[0, 2] ** 2)
+    #print(pose[1, 0] ** 2 + pose[1, 1] ** 2 + pose[1, 2] ** 2)
+    #print(pose[2, 0] ** 2 + pose[2, 1] ** 2 + pose[2, 2] ** 2)
     new_pose = np.array([
-        [pose[1, 0], -pose[1, 1], -pose[1, 2], pose[1, 3] * scale + offset[0]],
-        [pose[2, 0], -pose[2, 1], -pose[2, 2], pose[2, 3] * scale + offset[1]],
-        [pose[0, 0], -pose[0, 1], -pose[0, 2], pose[0, 3] * scale + offset[2]],
+        [0, -1, 0, 0.03 * scale + offset[0]],
+        [0, 0, -1, 0.75 * scale + offset[1]],
+        [1, 0, 0, 0.03 * scale + offset[2]],
         [0, 0, 0, 1],
     ], dtype=np.float32)
     return new_pose
 
-def random_pose(pose, pose_direction, current_angle, target_angle, scale=0.33, offset=[0, 0, 0]):
+def random_pose(processing, pose_r_direction, current_angle, pose_t_direction, current_tran):
+    if processing >= 1.0:
+        target_angle = np.array([0, 0, 0], dtype = np.float32)
+        target_angle[0] = 0#np.random.rand() * 0.001 - 0.0005 # 屏幕
+        target_angle[2] = np.random.rand() * 0.1 - 0.05 # 垂直
+        target_angle[1] = np.random.rand() * 0.1# 水平
+        if np.random.rand() >= 0.5:
+            target_angle[1] += 0.1
+        else:
+            target_angle[1] -= 0.2
+        target_tran = 3.2 * np.array([-np.sin(target_angle[2]) + np.random.rand() * 0.2 - 0.1, np.sin(target_angle[1]) + np.random.rand() * 0.2 - 0.1, 1.0], dtype = np.float32)# 水平，垂直，屏幕
+        pose_r_direction = target_angle - current_angle
+        pose_t_direction = target_tran - current_tran
+        processing = 0.0
+    current_angle += 0.02 * pose_r_direction
+    current_tran += 0.02 * pose_t_direction
+    processing += 0.1
+    #
+    r1 = np.array([
+        [np.cos(current_angle[0]), -np.sin(current_angle[0]), 0],
+        [np.sin(current_angle[0]), np.cos(current_angle[0]), 0],
+        [0, 0, 1]
+    ], dtype=np.float32)
+    r2 = np.array([
+        [1, 0, 0],
+        [0, np.cos(current_angle[1]), np.sin(current_angle[1])],
+        [0, -np.sin(current_angle[1]), np.cos(current_angle[1])]
+    ], dtype=np.float32)
+    r3 = np.array([
+        [np.cos(current_angle[2]), 0, -np.sin(current_angle[2])],
+        [0, 1, 0],
+        [np.sin(current_angle[2]), 0, np.cos(current_angle[2])]
+    ], dtype=np.float32)
+    pose_r = np.dot(np.dot(r1, r2), r3)
+    pose_t = current_tran.copy()
+    #
     new_pose = np.array([
-        [0, -1, 0, 0 * scale + offset[0]],
-        [0, 0, -1, pose[2, 3] * scale + offset[1]],
-        [1, 0, 0, 0 * scale + offset[2]],
+        [pose_r[1, 0], -pose_r[1, 1], -pose_r[1, 2], pose_t[1]],
+        [pose_r[2, 0], -pose_r[2, 1], -pose_r[2, 2], pose_t[2]],
+        [pose_r[0, 0], -pose_r[0, 1], -pose_r[0, 2], pose_t[0]],
         [0, 0, 0, 1],
     ], dtype=np.float32)
-    if current_angle == target_angle:
-        target_angle = [np.rand() * 0.1 * np.pi, np.rand() * 2.0 * np.pi]
-        pose_direction = target_angle - current_angle
-    current_angle += 0.1 * pose_direction
-    d_pose = np.array([
-        [-np.cos(current_angle[1]) * np.sin(current_angle[0]), -np.cos(current_angle[0]), -np.sin(current_angle[1]) * np.sin(current_angle[0]), 0],
-        [-np.cos(current_angle[1]) * np.sin(current_angle[0]), -np.sin(current_angle[1]) * np.sin(current_angle[0]), -np.cos(current_angle[0]), 0],
-        [np.cos(current_angle[0]), -np.cos(current_angle[1]) * np.sin(current_angle[0]), -np.sin(current_angle[1]) * np.sin(current_angle[0]), 0],
-        [0, 0, 0, 1],
-    ], dtype=np.float32)
-    return new_pose, pose_direction, current_angle, target_angle
+    return new_pose, processing, pose_r_direction, current_angle, pose_t_direction, current_tran
 
 def smooth_camera_path(poses, kernel_size=5):
     # smooth the camera trajectory...
@@ -57,7 +91,7 @@ def smooth_camera_path(poses, kernel_size=5):
     for i in range(N):
         start = max(0, i - K)
         end = min(N, i + K + 1)
-        poses[i, :3, 3] = trans[start:end].mean(0)
+        poses[i, :3, 3] = trans[start:end  ].mean(0)
         poses[i, :3, :3] = Rotation.from_matrix(rots[start:end]).mean().as_matrix()
 
     return poses
@@ -65,7 +99,7 @@ def smooth_camera_path(poses, kernel_size=5):
 def polygon_area(x, y):
     x_ = x - x.mean()
     y_ = y - y.mean()
-    correction = x_[-1] * y_[0] - y_[-1]* x_[0]
+    correction = x_[-1] * y_[0] - y_[-1] * x_[0]
     main_area = np.dot(x_[:-1], y_[1:]) - np.dot(y_[:-1], x_[1:])
     return 0.5 * np.abs(main_area + correction)
 
@@ -440,9 +474,11 @@ class NeRFDataset:
         self.images = []
 
         self.poses = []
-        self.pose_direction = [0., 0.]
-        self.current_angle = [0., 0.]
-        self.target_angle = [0., 0.]
+        self.processing = 1.0
+        self.pose_r_direction = [0., 0., 0.]
+        self.current_angle = [0., 0., 0.]
+        self.pose_t_direction = [0., 0., 0.]
+        self.current_tran = [0., 0, 3.2]
         self.exps = []
 
         self.auds = []
@@ -583,6 +619,7 @@ class NeRFDataset:
             print(f'[INFO] new_eye_area: {self.eye_area.min()} - {self.eye_area.max()}')
 
             if self.opt.smooth_eye:
+
                 # naive 5 window average
                 ori_eye = self.eye_area.copy()
                 for i in range(ori_eye.shape[0]):
@@ -666,10 +703,13 @@ class NeRFDataset:
 
         # head pose and bg image may mirror (replay --> <-- --> <--).
         index[0] = self.mirror_index(index[0])
+
         if self.opt.test:
-            poses = random_pose(self.pose_direction, self.current_angle, self.target_angle).to(self.device)
+            poses, self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran = random_pose(self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran)
+            poses = torch.from_numpy(np.reshape(poses, (-1, 4, 4))).to(self.device)
         else:
             poses = self.poses[index].to(self.device) # [B, 4, 4]
+        #poses = self.poses[index].to(self.device) # [B, 4, 4]
         
         if self.training and self.opt.finetune_lips:
             rect = self.lips_rect[index[0]]
