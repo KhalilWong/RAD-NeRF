@@ -704,7 +704,7 @@ class NeRFDataset:
         # head pose and bg image may mirror (replay --> <-- --> <--).
         index[0] = self.mirror_index(index[0])
 
-        if self.opt.test:
+        if self.opt.asr_nogui:
             poses, self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran = random_pose(self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran)
             poses = torch.from_numpy(np.reshape(poses, (-1, 4, 4))).to(self.device)
         else:
