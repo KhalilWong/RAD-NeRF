@@ -37,20 +37,20 @@ def nerf_matrix_to_ngp(pose, scale=0.33, offset=[0, 0, 0]):
 def random_pose(processing, pose_r_direction, current_angle, pose_t_direction, current_tran):
     if processing >= 1.0:
         target_angle = np.array([0, 0, 0], dtype = np.float32)
-        target_angle[0] = 0#np.random.rand() * 0.001 - 0.0005 # 屏幕
+        target_angle[0] = np.random.rand() * 0.02 - 0.01 # 屏幕 0
         target_angle[2] = np.random.rand() * 0.1 - 0.05 # 垂直
-        target_angle[1] = np.random.rand() * 0.1# 水平
+        target_angle[1] = np.random.rand() * 0.02# 水平
         if np.random.rand() >= 0.5:
-            target_angle[1] += 0.1
+            target_angle[1] += 0.02
         else:
-            target_angle[1] -= 0.2
-        target_tran = 3.2 * np.array([-np.sin(target_angle[2]) + np.random.rand() * 0.2 - 0.1, np.sin(target_angle[1]) + np.random.rand() * 0.2 - 0.1, 1.0], dtype = np.float32)# 水平，垂直，屏幕
+            target_angle[1] -= 0.04
+        target_tran = 3.2 * np.array([-np.sin(target_angle[2]) + np.random.rand() * 0.01 - 0.005, np.sin(target_angle[1]) + np.random.rand() * 0.01 - 0.005, 1.0], dtype = np.float32)# 水平，垂直，屏幕  + np.random.rand() * 0.06 - 0.03
         pose_r_direction = target_angle - current_angle
         pose_t_direction = target_tran - current_tran
         processing = 0.0
-    current_angle += 0.02 * pose_r_direction
-    current_tran += 0.02 * pose_t_direction
-    processing += 0.1
+    current_angle += 0.05 * pose_r_direction
+    current_tran += 0.05 * pose_t_direction
+    processing += 0.05
     #
     r1 = np.array([
         [np.cos(current_angle[0]), -np.sin(current_angle[0]), 0],
