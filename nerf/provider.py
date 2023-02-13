@@ -34,23 +34,23 @@ def nerf_matrix_to_ngp(pose, scale=0.33, offset=[0, 0, 0]):
     ], dtype=np.float32)
     return new_pose
 
-def random_pose(processing, pose_r_direction, current_angle, pose_t_direction, current_tran):
+def random_pose(processing, random_speed, pose_r_direction, current_angle, pose_t_direction, current_tran):
     if processing >= 1.0:
         target_angle = np.array([0, 0, 0], dtype = np.float32)
         target_angle[0] = np.random.rand() * 0.02 - 0.01 # 屏幕 0
         target_angle[2] = np.random.rand() * 0.1 - 0.05 # 垂直
-        target_angle[1] = np.random.rand() * 0.02# 水平
+        target_angle[1] = np.random.rand() * 0.01# 水平
         if np.random.rand() >= 0.5:
-            target_angle[1] += 0.02
+            target_angle[1] += 0.01
         else:
-            target_angle[1] -= 0.04
+            target_angle[1] -= 0.02
         target_tran = 3.2 * np.array([-np.sin(target_angle[2]) + np.random.rand() * 0.01 - 0.005, np.sin(target_angle[1]) + np.random.rand() * 0.01 - 0.005, 1.0], dtype = np.float32)# 水平，垂直，屏幕  + np.random.rand() * 0.06 - 0.03
         pose_r_direction = target_angle - current_angle
         pose_t_direction = target_tran - current_tran
         processing = 0.0
-    current_angle += 0.05 * pose_r_direction
-    current_tran += 0.05 * pose_t_direction
-    processing += 0.05
+    processing += random_speed
+    current_angle += (np.cos((processing - 1.0) * np.pi) - np.cos((processing - random_speed - 1.0) * np.pi)) / 2 * pose_r_direction
+    current_tran += (np.cos((processing - 1.0) * np.pi) - np.cos((processing - random_speed - 1.0) * np.pi)) / 2 * pose_t_direction
     #
     r1 = np.array([
         [np.cos(current_angle[0]), -np.sin(current_angle[0]), 0],
@@ -475,6 +475,7 @@ class NeRFDataset:
 
         self.poses = []
         self.processing = 1.0
+        self.random_speed = 0.025
         self.pose_r_direction = [0., 0., 0.]
         self.current_angle = [0., 0., 0.]
         self.pose_t_direction = [0., 0., 0.]
@@ -705,7 +706,7 @@ class NeRFDataset:
         index[0] = self.mirror_index(index[0])
 
         if self.opt.asr_nogui != -1:
-            poses, self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran = random_pose(self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran)
+            poses, self.processing, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran = random_pose(self.processing, self.random_speed, self.pose_r_direction, self.current_angle, self.pose_t_direction, self.current_tran)
             poses = torch.from_numpy(np.reshape(poses, (-1, 4, 4))).to(self.device)
         else:
             poses = self.poses[index].to(self.device) # [B, 4, 4]

@@ -47,12 +47,13 @@ class NeRFNoGUILive:
 
         # control eye
         self.eye_area = None if not self.opt.exp_eye else data_loader._data.eye_area.mean().item()
-        #print(self.eye_area)
+        print(min(data_loader._data.eye_area), max(data_loader._data.eye_area))
+        self.eye_area = 0.5
         self.dynamic_area = self.eye_area
         self.blinking = False
         self.canblink = True
-        self.blinkspeed = 0.01
-        self.blinkdirect = -1
+        self.blinkspeed = 0.1
+        self.blinkprocessing = 0.0
 
         # playing seq from dataloader, or pause.
         self.playing = True# False
@@ -105,17 +106,16 @@ class NeRFNoGUILive:
                 data['eye'] = torch.FloatTensor([self.eye_area]).view(1, 1).to(self.device)
                 data['auds'] = self.asr.get_next_feat()
                 if self.blinking:
-                    self.dynamic_area += self.blinkspeed * self.blinkdirect
-                    if self.dynamic_area < 0:
-                        self.dynamic_area = 0
-                        self.blinkdirect *= -1
-                    elif self.dynamic_area > self.eye_area:
-                        self.dynamic_area = self.eye_area
-                        self.blinkdirect *= -1
+                    self.blinkprocessing += self.blinkspeed
+                    if self.blinkprocessing >= 1.0:
+                        self.blinkprocessing = 0.0
                         self.blinking = False
+                    self.dynamic_area = (np.cos(self.blinkprocessing * 2.0 * np.pi) + 1) / 2 * self.eye_area
                     data['eye'] = torch.FloatTensor([self.dynamic_area]).view(1, 1).to(self.device)
                 #print('DATA EYE:', data['eye'])
                 outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
+                #print('test camera: ', data['poses_matrix'][0].detach().cpu().numpy())
+                #self.cam.update_pose(data['poses_matrix'][0].detach().cpu().numpy())
             
             ender.record()
             torch.cuda.synchronize()
@@ -169,7 +169,7 @@ class NeRFNoGUILive:
         #print('sssssssss', speech_config.output_format)
 
         audio_config = AudioOutputConfig(use_default_speaker=True)
-        synthesizer = SpeechSynthesizer(speech_config = speech_config, audio_config = audio_config)
+        synthesizer = SpeechSynthesizer(speech_config = speech_config, audio_config = None)
         return synthesizer
     ###############################################################################################
     def BlinkCtrl(self):
